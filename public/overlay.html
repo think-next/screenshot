@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Overlay</title>
+    <style>
+        html,
+        body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            -webkit-user-select: none;
+            user-select: none;
+            overflow: hidden;
+        }
+
+        #mask {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.14);
+            backdrop-filter: blur(2px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: crosshair;
+        }
+
+        #center {
+            color: white;
+            font-size: 56px;
+            font-weight: 700;
+            background: rgba(0, 0, 0, 0.28);
+            padding: 24px 40px;
+            border-radius: 10px;
+            pointer-events: none;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="mask">
+        <div id="center">hello</div>
+    </div>
+
+    <script type="module">
+        import { WebviewWindow } from '@tauri-apps/api/window';
+
+        function restoreAndClose() {
+            try {
+                const main = WebviewWindow.getByLabel('main');
+                if (main) {
+                    main.show();
+                    // focus main window
+                    main.rpc?.notify?.('focus') || main.show();
+                }
+            } catch (e) {
+                console.warn('could not show main window', e);
+            }
+            window.close();
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') restoreAndClose();
+        });
+
+        // Dismiss when clicking on the mask (not the center element)
+        document.getElementById('mask')?.addEventListener('click', (e) => {
+            const target = e.target;
+            if (target && (target.id === 'mask')) {
+                restoreAndClose();
+            }
+        });
+
+        // If the overlay is closed from native side, try to restore main as a fallback
+        window.addEventListener('beforeunload', () => {
+            try { const main = WebviewWindow.getByLabel('main'); if (main) main.show(); } catch (e) { }
+        });
+    </script>
+</body>
+
+</html>
