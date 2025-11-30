@@ -18,8 +18,8 @@ async function startOverlayWindow() {
       }
       if (!isTauri) {
         console.warn('not running inside Tauri runtime; falling back to in-app overlay');
-        showOverlayLocal.value = true;
-        return;
+        // showOverlayLocal.value = true;
+        // return;
       }
 
       // dynamic import to avoid static typing/export differences across @tauri-apps/api versions
@@ -42,23 +42,48 @@ async function startOverlayWindow() {
 
       // create overlay window if constructor available
       if (typeof WebviewWindow === 'function') {
-        new WebviewWindow('overlay', {
-          url: 'overlay.html',
-          title: 'Overlay',
-          transparent: true,
-          decorations: false,
-          alwaysOnTop: true,
-          fullscreen: true,
-          visible: true,
-        });
+        var overlayWindow = null;
+        try{
+          overlayWindow = new WebviewWindow('overlay', {
+                    url: 'overlay.html',
+                    title: 'Overlay',
+                    transparent: true,
+                    decorations: false,
+                    alwaysOnTop: true,
+                    fullscreen: false,
+                    visible: true,
+                    x: 0,
+                    y: 0,
+                    width: 1920,  // 可以根据实际屏幕尺寸调整
+                    height: 1080  // 可以根据实际屏幕尺寸调整
+                  });
+        } catch (e) {
+          console.warn('failed to import WebviewWindow', e);
+        }
+        
+        console.log('Waiting for window initialization...');
+        await new Promise(resolve => setTimeout(resolve, 200));
+
+        try {
+         await overlayWindow.show();
+        } catch (e) {
+          console.warn('overlay window show failed', e);
+        }
+
+        try {
+         await overlayWindow.setFocus();
+        } catch (e) {
+          console.warn('overlay window setFocus failed', e);
+        }
+
       } else {
         console.error('WebviewWindow constructor not available on @tauri-apps/api/window', tauriWindow);
-        showOverlayLocal.value = true;
+        // showOverlayLocal.value = true;
       }
     } catch (e) {
     // fallback: show local overlay inside the app (useful during web dev)
     console.warn('failed to create overlay window, falling back to in-app overlay', e);
-    showOverlayLocal.value = true;
+    // showOverlayLocal.value = true;
   }
 }
 
