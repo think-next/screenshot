@@ -1,89 +1,72 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from "vue";
+import { getCurrentWindow } from '@tauri-apps/api/window';
 
 const showOverlayLocal = ref(false); // kept for dev fallback if needed
 const selectionInfo = ref<{x:number,y:number,w:number,h:number}|null>(null);
+const screenshotData = ref<string|null>(null);
 
 let selectionUnlisten: (() => void) | null = null;
 
 async function startOverlayWindow() {
+  try {
+    console.log('Starting screenshot process...');
+    
+    // 获取当前窗口实例
+    const currentWindow = getCurrentWindow();
+    console.log('Got current window object');
+
+    // 隐藏当前窗口
     try {
-      // First check we're running inside Tauri
-      // prefer a quick runtime check for Tauri environment
-      let isTauri = false;
-      try {
-        isTauri = typeof window !== 'undefined' && !!(window as any).__TAURI__;
-      } catch (_) {
-        isTauri = false;
-      }
-      if (!isTauri) {
-        console.warn('not running inside Tauri runtime; falling back to in-app overlay');
-        // showOverlayLocal.value = true;
-        // return;
-      }
-
-      // dynamic import to avoid static typing/export differences across @tauri-apps/api versions
-      const tauriWindow: any = await import('@tauri-apps/api/window');
-      const WebviewWindow = tauriWindow.WebviewWindow || tauriWindow.Window || tauriWindow.createWindow;
-      const getCurrent = tauriWindow.getCurrent;
-      const appWindow = tauriWindow.appWindow;
-
-      // hide the current main window (try getCurrent -> appWindow)
-      try {
-        if (getCurrent) {
-          const current = getCurrent();
-          await current.hide();
-        } else if (appWindow && appWindow.hide) {
-          await appWindow.hide();
-        }
-      } catch (hideErr) {
-        console.warn('failed to hide main window', hideErr);
-      }
-
-      // create overlay window if constructor available
-      if (typeof WebviewWindow === 'function') {
-        var overlayWindow = null;
-        try{
-          overlayWindow = new WebviewWindow('overlay', {
-                    url: 'overlay.html',
-                    title: 'Overlay',
-                    transparent: true,
-                    decorations: false,
-                    alwaysOnTop: true,
-                    fullscreen: false,
-                    visible: true,
-                    x: 0,
-                    y: 0,
-                    width: 1920,  // 可以根据实际屏幕尺寸调整
-                    height: 1080  // 可以根据实际屏幕尺寸调整
-                  });
-        } catch (e) {
-          console.warn('failed to import WebviewWindow', e);
-        }
-        
-        console.log('Waiting for window initialization...');
-        await new Promise(resolve => setTimeout(resolve, 200));
-
-        try {
-         await overlayWindow.show();
-        } catch (e) {
-          console.warn('overlay window show failed', e);
-        }
-
-        try {
-         await overlayWindow.setFocus();
-        } catch (e) {
-          console.warn('overlay window setFocus failed', e);
-        }
-
+      if (currentWindow && typeof currentWindow.hide === 'function') {
+        console.log('Hiding window using currentWindow.hide()');
+        await currentWindow.hide();
+        console.log('Window hidden successfully');
       } else {
-        console.error('WebviewWindow constructor not available on @tauri-apps/api/window', tauriWindow);
-        // showOverlayLocal.value = true;
+        console.warn('Current window does not have hide method');
+        console.warn('Warning: Unable to hide window, proceeding with screenshot anyway');
       }
+    } catch (hideErr) {
+      console.error('Failed to hide main window:', hideErr);
+      console.warn('窗口隐藏失败，但仍将继续截图流程');
+    }
+
+    // 等待一段时间确保窗口已隐藏
+    console.log('Waiting for window to hide...');
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // 调用截图功能
+    try {
+      console.log('Attempting to invoke capture_screen command');
+      const tauriApi: any = await import('@tauri-apps/api/core');
+      const imageData = await tauriApi.invoke('capture_screen');
+      console.log('Screenshot command invoked successfully, received data length:', imageData.length);
+      
+      // 将截图数据保存到响应式变量中，设置为背景图
+      screenshotData.value = `data:image/png;base64,${imageData}`;
+      console.log('Screenshot captured and set as background');
     } catch (e) {
-    // fallback: show local overlay inside the app (useful during web dev)
-    console.warn('failed to create overlay window, falling back to in-app overlay', e);
-    // showOverlayLocal.value = true;
+      console.error('Failed to capture screen:', e);
+    }
+
+    // 显示当前窗口
+    try {
+      console.log('Showing window again...');
+      if (currentWindow && typeof currentWindow.show === 'function') {
+        console.log('Showing window using currentWindow.show()');
+        await currentWindow.show();
+        console.log('Window shown successfully');
+      } else {
+        console.warn('Current window does not have show method');
+      }
+    } catch (showErr) {
+      console.error('Failed to show main window:', showErr);
+      console.warn('窗口显示失败');
+    }
+    
+    console.log('Screenshot process completed.');
+  } catch (e) {
+    console.error('Error during screenshot process:', e);
   }
 }
 
@@ -96,17 +79,6 @@ async function handleSelectionEvent(payload: any) {
   // show the selection briefly in the UI for verification
   if (payload && typeof payload.x === 'number') {
     selectionInfo.value = { x: payload.x, y: payload.y, w: payload.w, h: payload.h };
-  }
-  // restore main window if possible
-  try {
-    const tauriWindow: any = await import('@tauri-apps/api/window');
-    const WebviewWindow = tauriWindow.WebviewWindow;
-    if (WebviewWindow && WebviewWindow.getByLabel) {
-      const main = WebviewWindow.getByLabel('main');
-      if (main && main.show) await main.show();
-    }
-  } catch (e) {
-    console.warn('restore main window failed', e);
   }
 }
 
@@ -128,7 +100,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div>
+  <div :class="{ 'with-background': screenshotData }" :style="screenshotData ? { backgroundImage: `url(${screenshotData})` } : {}">
     <div class="toolbar">
       <div class="toolbar-inner">
         <button class="screenshot-btn" @click="startOverlayWindow">截屏</button>
@@ -137,7 +109,7 @@ onBeforeUnmount(() => {
 
     <main class="container">
       <h1>轻量截屏工具</h1>
-      <p class="subtitle">点击上方按钮开始截屏（演示遮罩）</p>
+      <p class="subtitle">点击上方按钮开始截屏</p>
       <div v-if="selectionInfo" class="selection-info">
         选区: x={{selectionInfo.x}} y={{selectionInfo.y}} w={{selectionInfo.w}} h={{selectionInfo.h}}
       </div>
@@ -207,6 +179,23 @@ onBeforeUnmount(() => {
   border-radius: 6px;
 }
 
+.with-background {
+  background-size: cover;
+  background-position: center;
+  min-height: 100vh;
+}
+
+.with-background .toolbar-inner {
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.with-background .container {
+  background: rgba(255, 255, 255, 0.7);
+  padding: 20px;
+  border-radius: 10px;
+  backdrop-filter: blur(5px);
+}
+
 .overlay {
   position: fixed;
   inset: 0;
@@ -237,5 +226,4 @@ onBeforeUnmount(() => {
     background: #2b6cb0;
   }
 }
-
 </style>
