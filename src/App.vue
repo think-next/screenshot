@@ -43,7 +43,7 @@ async function startOverlayWindow() {
       console.log('Screenshot command invoked successfully, received data length:', imageData.length);
       
       // 将截图数据保存到响应式变量中，设置为背景图
-      screenshotData.value = `data:image/png;base64,${imageData}`;
+      screenshotData.value = `data:image/jpeg;base64,${imageData}`;
       console.log('Screenshot captured and set as background');
     } catch (e) {
       console.error('Failed to capture screen:', e);
