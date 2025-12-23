@@ -43,16 +43,25 @@ pub fn capture_screen() -> Result<String, String> {
     })?;
     info!("截图操作完成，耗时: {:?}", capture_start.elapsed());
 
-    // 将图像编码为JPEG格式的字节
+    // 将图像编码为JPEG格式的字节（质量设置为85，平衡文件大小和图像质量）
+    // JPEG不支持alpha通道，需要将RGBA转换为RGB
     let encode_start = Instant::now();
+    let rgb_image = image::DynamicImage::ImageRgba8(image).to_rgb8();
     let mut buffer: Vec<u8> = Vec::new();
-    let mut cursor = std::io::Cursor::new(&mut buffer);
-    image
-        .write_to(&mut cursor, image::ImageFormat::Jpeg)
-        .map_err(|e| {
-            error!("图像编码失败: {}", e);
-            format!("图像编码失败: {}", e)
-        })?;
+    {
+        let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buffer, 85);
+        encoder
+            .encode(
+                rgb_image.as_raw(),
+                rgb_image.width(),
+                rgb_image.height(),
+                image::ExtendedColorType::Rgb8,
+            )
+            .map_err(|e| {
+                error!("图像JPEG编码失败: {}", e);
+                format!("图像JPEG编码失败: {}", e)
+            })?;
+    }
     info!("图像JPEG编码完成，耗时: {:?}", encode_start.elapsed());
 
     // 将字节转换为Base64字符串
