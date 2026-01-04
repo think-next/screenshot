@@ -1,5 +1,6 @@
 use base64::{engine::general_purpose, Engine as _};
 use log::{error, info};
+use rayon::prelude::*;
 use std::time::Instant;
 use tauri::command;
 use xcap::Monitor;
@@ -43,19 +44,40 @@ pub fn capture_screen() -> Result<String, String> {
     })?;
     info!("截图操作完成，耗时: {:?}", capture_start.elapsed());
 
+    let width = image.width();
+    let height = image.height();
+    let rgba_data = image.as_raw();
+
+    // 使用并行处理将RGBA转换为RGB，预分配缓冲区避免动态增长
+    let convert_start = Instant::now();
+    let pixel_count = (width * height) as usize;
+    let mut rgb_data = Vec::with_capacity(pixel_count * 3);
+    rgb_data.resize(pixel_count * 3, 0);
+
+    // 使用并行迭代器高效转换，直接写入预分配的缓冲区
+    rgba_data
+        .par_chunks_exact(4)
+        .zip(rgb_data.par_chunks_exact_mut(3))
+        .for_each(|(rgba, rgb)| {
+            rgb[0] = rgba[0];
+            rgb[1] = rgba[1];
+            rgb[2] = rgba[2];
+            // 跳过alpha通道
+        });
+    info!("RGBA到RGB转换完成，耗时: {:?}", convert_start.elapsed());
+
     // 将图像编码为JPEG格式的字节（质量设置为85，平衡文件大小和图像质量）
     // JPEG不支持alpha通道，需要将RGBA转换为RGB
     let encode_start = Instant::now();
-    let rgb_image = image::DynamicImage::ImageRgba8(image).to_rgb8();
     let mut buffer: Vec<u8> = Vec::new();
     {
-        let mut encoder = image::codecs::jpeg::JpegEncoder::new_with_quality(&mut buffer, 85);
+        let encoder = jpeg_encoder::Encoder::new(&mut buffer, 100);
         encoder
             .encode(
-                rgb_image.as_raw(),
-                rgb_image.width(),
-                rgb_image.height(),
-                image::ExtendedColorType::Rgb8,
+                &rgb_data,
+                width as u16,
+                height as u16,
+                jpeg_encoder::ColorType::Rgb,
             )
             .map_err(|e| {
                 error!("图像JPEG编码失败: {}", e);

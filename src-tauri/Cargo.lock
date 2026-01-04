@@ -2241,6 +2241,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "jpeg-encoder"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "87901bb106f5fc589db5106826b2c49c3de7de34e61638b20575a838db1de6eb"
+
+[[package]]
 name = "js-sys"
 version = "0.3.82"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4039,7 +4045,9 @@ dependencies = [
  "dirs 5.0.1",
  "env_logger",
  "image 0.25.9",
+ "jpeg-encoder",
  "log",
+ "rayon",
  "serde",
  "serde_json",
  "tauri",
