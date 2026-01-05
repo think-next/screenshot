@@ -16,23 +16,15 @@ async function startOverlayWindow() {
     const currentWindow = getCurrentWindow();
     console.log('Got current window object');
 
-    // 隐藏当前窗口
-    try {
-      if (currentWindow && typeof currentWindow.hide === 'function') {
-        console.log('Hiding window using currentWindow.hide()');
+    if (currentWindow && typeof currentWindow.hide === 'function') {
         await currentWindow.hide();
-        console.log('Window hidden successfully');
+        console.log('Window hide successfully');
       } else {
         console.warn('Current window does not have hide method');
-        console.warn('Warning: Unable to hide window, proceeding with screenshot anyway');
       }
-    } catch (hideErr) {
-      console.error('Failed to hide main window:', hideErr);
-      console.warn('窗口隐藏失败，但仍将继续截图流程');
-    }
 
-    // 等待一段时间确保窗口已隐藏
-    console.log('Waiting for window to hide...');
+    // 等待一段时间确保窗口已全屏
+    console.log('Waiting for window to go fullscreen...');
     await new Promise(resolve => setTimeout(resolve, 500));
 
     // 调用截图功能
@@ -49,9 +41,17 @@ async function startOverlayWindow() {
       console.error('Failed to capture screen:', e);
     }
 
-    // 显示当前窗口
+    // 退出全屏并显示当前窗口
     try {
-      console.log('Showing window again...');
+      console.log('Exiting fullscreen and showing window...');
+      if (currentWindow && typeof currentWindow.setFullscreen === 'function') {
+        console.log('Exiting fullscreen using currentWindow.setFullscreen()');
+        await currentWindow.setFullscreen(true);
+        console.log('Fullscreen exited successfully');
+      } else {
+        console.warn('Current window does not have setFullscreen method');
+      }
+      
       if (currentWindow && typeof currentWindow.show === 'function') {
         console.log('Showing window using currentWindow.show()');
         await currentWindow.show();
@@ -60,8 +60,8 @@ async function startOverlayWindow() {
         console.warn('Current window does not have show method');
       }
     } catch (showErr) {
-      console.error('Failed to show main window:', showErr);
-      console.warn('窗口显示失败');
+      console.error('Failed to show main window or exit fullscreen:', showErr);
+      console.warn('窗口显示或退出全屏失败');
     }
     
     console.log('Screenshot process completed.');
@@ -69,6 +69,8 @@ async function startOverlayWindow() {
     console.error('Error during screenshot process:', e);
   }
 }
+
+// 添加键盘事件监听器，用于ESC键退出全屏
 
 function hideOverlayLocal() {
   showOverlayLocal.value = false;
@@ -88,6 +90,22 @@ onMounted(async () => {
     // listen for selection events emitted by overlay
     selectionUnlisten = await evt.listen('screenshot-selection', (e: any) => {
       handleSelectionEvent(e.payload);
+    });
+    
+    // 添加键盘事件监听器，用于ESC键退出全屏
+    window.addEventListener('keydown', async (event) => {
+      if (event.key === 'Escape') {
+        const currentWindow = getCurrentWindow();
+        try {
+          // 退出全屏模式
+          if (currentWindow && typeof currentWindow.setFullscreen === 'function') {
+            await currentWindow.setFullscreen(false);
+            console.log('Fullscreen exited via Escape key');
+          }
+        } catch (err) {
+          console.error('Failed to exit fullscreen:', err);
+        }
+      }
     });
   } catch (e) {
     console.warn('event listen failed', e);
