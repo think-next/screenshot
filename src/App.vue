@@ -43,7 +43,14 @@ async function startOverlayWindow() {
 
     // 退出全屏并显示当前窗口
     try {
-      console.log('Exiting fullscreen and showing window...');
+      if (currentWindow && typeof currentWindow.show === 'function') {
+        console.log('Showing window using currentWindow.show()');
+        await currentWindow.show();
+        console.log('Window shown successfully');
+      } else {
+        console.warn('Current window does not have show method');
+      }
+
       if (currentWindow && typeof currentWindow.setFullscreen === 'function') {
         console.log('Exiting fullscreen using currentWindow.setFullscreen()');
         await currentWindow.setFullscreen(true);
@@ -52,13 +59,6 @@ async function startOverlayWindow() {
         console.warn('Current window does not have setFullscreen method');
       }
       
-      if (currentWindow && typeof currentWindow.show === 'function') {
-        console.log('Showing window using currentWindow.show()');
-        await currentWindow.show();
-        console.log('Window shown successfully');
-      } else {
-        console.warn('Current window does not have show method');
-      }
     } catch (showErr) {
       console.error('Failed to show main window or exit fullscreen:', showErr);
       console.warn('窗口显示或退出全屏失败');
