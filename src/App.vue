@@ -140,7 +140,32 @@ onBeforeUnmount(() => {
   </div>
 </template>
 
+<style>
+/* 重置html和body的默认间距 */
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#app {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
+</style>
+
 <style scoped>
+/* 重置根元素的默认间距 */
+div {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 .toolbar {
   position: fixed;
   top: 14px;
@@ -201,6 +226,9 @@ onBeforeUnmount(() => {
   background-size: cover;
   background-position: center;
   min-height: 100vh;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
 }
 
 .with-background .toolbar-inner {
