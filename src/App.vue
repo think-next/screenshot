@@ -5,6 +5,7 @@ import { getCurrentWindow } from '@tauri-apps/api/window';
 const showOverlayLocal = ref(false); // kept for dev fallback if needed
 const selectionInfo = ref<{x:number,y:number,w:number,h:number}|null>(null);
 const screenshotData = ref<string|null>(null);
+const isFullscreenView = ref(false); // 是否处于全屏查看模式
 
 let selectionUnlisten: (() => void) | null = null;
 
@@ -55,6 +56,8 @@ async function startOverlayWindow() {
         console.log('Exiting fullscreen using currentWindow.setFullscreen()');
         await currentWindow.setFullscreen(true);
         console.log('Fullscreen exited successfully');
+        // 进入全屏查看模式
+        isFullscreenView.value = true;
       } else {
         console.warn('Current window does not have setFullscreen method');
       }
@@ -101,6 +104,10 @@ onMounted(async () => {
           if (currentWindow && typeof currentWindow.setFullscreen === 'function') {
             await currentWindow.setFullscreen(false);
             console.log('Fullscreen exited via Escape key');
+            // 退出全屏查看模式
+            isFullscreenView.value = false;
+            // 清除截图数据，恢复初始状态
+            screenshotData.value = null;
           }
         } catch (err) {
           console.error('Failed to exit fullscreen:', err);
@@ -118,7 +125,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div :class="{ 'with-background': screenshotData }" :style="screenshotData ? { backgroundImage: `url(${screenshotData})` } : {}">
+  <div :class="{ 'with-background': screenshotData, 'fullscreen-view': isFullscreenView }" :style="screenshotData ? { backgroundImage: `url(${screenshotData})` } : {}">
     <div class="toolbar">
       <div class="toolbar-inner">
         <button class="screenshot-btn" @click="startOverlayWindow">截屏</button>
@@ -271,5 +278,18 @@ div {
   .screenshot-btn {
     background: #2b6cb0;
   }
+}
+
+/* 全屏查看模式：隐藏所有UI元素，只显示背景图 */
+.fullscreen-view .toolbar {
+  display: none;
+}
+
+.fullscreen-view .container {
+  display: none;
+}
+
+.fullscreen-view .overlay {
+  display: none;
 }
 </style>
