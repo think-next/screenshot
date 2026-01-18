@@ -53,9 +53,9 @@ async function startOverlayWindow() {
       }
 
       if (currentWindow && typeof currentWindow.setFullscreen === 'function') {
-        console.log('Exiting fullscreen using currentWindow.setFullscreen()');
+        console.log('Entering fullscreen mode');
         await currentWindow.setFullscreen(true);
-        console.log('Fullscreen exited successfully');
+        console.log('Fullscreen entered successfully');
         // 进入全屏查看模式
         isFullscreenView.value = true;
       } else {
