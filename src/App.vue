@@ -51,7 +51,7 @@ async function startOverlayWindow() {
       } else {
         console.warn('Current window does not have show method');
       }
-
+      
       if (currentWindow && typeof currentWindow.setFullscreen === 'function') {
         console.log('Entering fullscreen mode');
         await currentWindow.setFullscreen(true);
@@ -60,6 +60,15 @@ async function startOverlayWindow() {
         isFullscreenView.value = true;
       } else {
         console.warn('Current window does not have setFullscreen method');
+      }
+
+      // 设置 macOS 全屏演示模式，自动隐藏菜单栏和 Dock
+      try {
+        const tauriApi: any = await import('@tauri-apps/api/core');
+        await tauriApi.invoke('set_macos_presentation_mode', { fullscreen: true });
+        console.log('macOS presentation mode set to fullscreen');
+      } catch (presentErr) {
+        console.warn('Failed to set macOS presentation mode:', presentErr);
       }
       
     } catch (showErr) {
@@ -104,6 +113,16 @@ onMounted(async () => {
           if (currentWindow && typeof currentWindow.setFullscreen === 'function') {
             await currentWindow.setFullscreen(false);
             console.log('Fullscreen exited via Escape key');
+
+            // 恢复 macOS 演示模式
+            try {
+              const tauriApi: any = await import('@tauri-apps/api/core');
+              await tauriApi.invoke('set_macos_presentation_mode', { fullscreen: false });
+              console.log('macOS presentation mode restored to normal');
+            } catch (presentErr) {
+              console.warn('Failed to restore macOS presentation mode:', presentErr);
+            }
+
             // 退出全屏查看模式
             isFullscreenView.value = false;
             // 清除截图数据，恢复初始状态
