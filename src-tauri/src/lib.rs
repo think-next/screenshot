@@ -52,10 +52,10 @@ async fn set_macos_presentation_mode(fullscreen: bool) -> Result<(), String> {
         if fullscreen {
             info!("正在设置全屏演示模式（隐藏 Dock 和菜单栏）");
 
-            // 方法1：尝试使用 setPresentationOptions_
-            let options = NSApplicationPresentationOptions::NSApplicationPresentationFullScreen
-                | NSApplicationPresentationOptions::NSApplicationPresentationHideDock
-                | NSApplicationPresentationOptions::NSApplicationPresentationHideMenuBar;
+            let options = NSApplicationPresentationOptions::NSApplicationPresentationHideDock
+                    | NSApplicationPresentationOptions::NSApplicationPresentationHideMenuBar
+                    | NSApplicationPresentationOptions::NSApplicationPresentationDisableHideApplication
+                    | NSApplicationPresentationOptions::NSApplicationPresentationDisableProcessSwitching;
 
             info!("方法1: 使用 setPresentationOptions_（在主线程上）");
             info!("Presentation Options 值: {:?}", options);
