@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount } from "vue";
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import CrosshairComponent from './components/CrosshairComponent.vue';
+import { useCrosshair } from './composables/useCrosshair';
 
 const showOverlayLocal = ref(false); // kept for dev fallback if needed
 const selectionInfo = ref<{x:number,y:number,w:number,h:number}|null>(null);
@@ -8,6 +10,7 @@ const screenshotData = ref<string|null>(null);
 const isFullscreenView = ref(false); // 是否处于全屏查看模式
 
 let selectionUnlisten: (() => void) | null = null;
+const { position: mousePosition, startTracking, stopTracking } = useCrosshair();
 
 async function startOverlayWindow() {
   try {
@@ -58,6 +61,9 @@ async function startOverlayWindow() {
         console.log('Fullscreen entered successfully');
         // 进入全屏查看模式
         isFullscreenView.value = true;
+        
+        // 启动十字线跟踪
+        startTracking();
       } else {
         console.warn('Current window does not have setFullscreen method');
       }
@@ -81,8 +87,6 @@ async function startOverlayWindow() {
     console.error('Error during screenshot process:', e);
   }
 }
-
-// 添加键盘事件监听器，用于ESC键退出全屏
 
 function hideOverlayLocal() {
   showOverlayLocal.value = false;
@@ -127,6 +131,8 @@ onMounted(async () => {
             isFullscreenView.value = false;
             // 清除截图数据，恢复初始状态
             screenshotData.value = null;
+            // 停止十字线跟踪
+            stopTracking();
           }
         } catch (err) {
           console.error('Failed to exit fullscreen:', err);
@@ -163,6 +169,12 @@ onBeforeUnmount(() => {
     <div v-if="showOverlayLocal" class="overlay" @click.self="hideOverlayLocal">
       <div class="overlay-center">hello</div>
     </div>
+
+    <!-- 十字线组件：在全屏查看模式下显示 -->
+    <CrosshairComponent
+      :visible="isFullscreenView"
+      :position="mousePosition"
+    />
   </div>
 </template>
 
