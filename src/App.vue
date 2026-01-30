@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount } from "vue";
+import { ref, onMounted, onBeforeUnmount, watch } from "vue";
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import CrosshairComponent from './components/CrosshairComponent.vue';
+import SelectionRectangleComponent from './components/SelectionRectangleComponent.vue';
 import { useCrosshair } from './composables/useCrosshair';
+import { useSelection } from './composables/useSelection';
 
 const showOverlayLocal = ref(false); // kept for dev fallback if needed
 const selectionInfo = ref<{x:number,y:number,w:number,h:number}|null>(null);
@@ -11,6 +13,11 @@ const isFullscreenView = ref(false); // 是否处于全屏查看模式
 
 let selectionUnlisten: (() => void) | null = null;
 const { position: mousePosition, startTracking, stopTracking } = useCrosshair();
+const { isSelecting, selection, startSelection: startRegionSelection, stopSelection: stopRegionSelection, clearSelection } = useSelection();
+
+// 获取设备像素比，用于在 Retina 显示器上正确映射坐标
+const devicePixelRatio = window.devicePixelRatio || 1;
+console.log('Device pixel ratio:', devicePixelRatio);
 
 async function startOverlayWindow() {
   try {
@@ -62,8 +69,11 @@ async function startOverlayWindow() {
         // 进入全屏查看模式
         isFullscreenView.value = true;
         
-        // 启动十字线跟踪
-        startTracking();
+      // 启动十字线跟踪
+      startTracking();
+      
+      // 启动区域选择
+      startRegionSelection();
       } else {
         console.warn('Current window does not have setFullscreen method');
       }
@@ -107,6 +117,65 @@ onMounted(async () => {
     selectionUnlisten = await evt.listen('screenshot-selection', (e: any) => {
       handleSelectionEvent(e.payload);
     });
+
+    // 监听选择状态变化，当用户完成选择时自动截图
+    watch([selection, isSelecting], async ([newSelection, newIsSelecting]) => {
+      // 当选择完成且有有效的选区时
+      if (!newIsSelecting && newSelection && newSelection.width > 5 && newSelection.height > 5 && isFullscreenView.value) {
+        try {
+          console.log('Selection completed, capturing region:', newSelection);
+          console.log('Device pixel ratio:', devicePixelRatio);
+          
+          // 将 CSS 像素转换为物理像素（Retina 显示器需要）
+          const physicalX = Math.round(newSelection.startX * devicePixelRatio);
+          const physicalY = Math.round(newSelection.startY * devicePixelRatio);
+          const physicalWidth = Math.round(newSelection.width * devicePixelRatio);
+          const physicalHeight = Math.round(newSelection.height * devicePixelRatio);
+          
+          console.log('CSS pixels:', newSelection);
+          console.log('Physical pixels:', { x: physicalX, y: physicalY, width: physicalWidth, height: physicalHeight });
+          
+          // 调用后端命令捕获并保存区域截图
+          const tauriApi: any = await import('@tauri-apps/api/core');
+          const filePath = await tauriApi.invoke('capture_and_save_region', {
+            x: physicalX,
+            y: physicalY,
+            width: physicalWidth,
+            height: physicalHeight
+          });
+          
+          console.log('Screenshot saved to:', filePath);
+          
+          // 显示保存成功提示（可选）
+          alert(`截图已保存到: ${filePath}`);
+          
+          // 退出全屏模式
+          const currentWindow = getCurrentWindow();
+          if (currentWindow && typeof currentWindow.setFullscreen === 'function') {
+            await currentWindow.setFullscreen(false);
+            console.log('Fullscreen exited after screenshot');
+            
+            // 恢复 macOS 演示模式
+            try {
+              await tauriApi.invoke('set_macos_presentation_mode', { fullscreen: false });
+              console.log('macOS presentation mode restored');
+            } catch (presentErr) {
+              console.warn('Failed to restore macOS presentation mode:', presentErr);
+            }
+            
+            // 退出全屏查看模式
+            isFullscreenView.value = false;
+            screenshotData.value = null;
+            stopTracking();
+            stopRegionSelection();
+            clearSelection();
+          }
+        } catch (err) {
+          console.error('Failed to capture and save screenshot:', err);
+          alert('截图保存失败: ' + err);
+        }
+      }
+    });
     
     // 添加键盘事件监听器，用于ESC键退出全屏
     window.addEventListener('keydown', async (event) => {
@@ -133,6 +202,9 @@ onMounted(async () => {
             screenshotData.value = null;
             // 停止十字线跟踪
             stopTracking();
+            
+            // 停止区域选择
+            stopRegionSelection();
           }
         } catch (err) {
           console.error('Failed to exit fullscreen:', err);
@@ -174,6 +246,13 @@ onBeforeUnmount(() => {
     <CrosshairComponent
       :visible="isFullscreenView"
       :position="mousePosition"
+    />
+
+    <!-- 选择矩形组件：在全屏查看模式下显示 -->
+    <SelectionRectangleComponent
+      :visible="isFullscreenView"
+      :selection="selection"
+      :show-dimensions="true"
     />
   </div>
 </template>

@@ -186,6 +186,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet,
             screenshot::capture_screen,
+            screenshot::capture_region,
+            screenshot::save_screenshot,
+            screenshot::capture_and_save_region,
             set_macos_presentation_mode
         ])
         .run(tauri::generate_context!())
