@@ -2,11 +2,15 @@ use base64::{engine::general_purpose, Engine as _};
 use image::imageops;
 use log::{error, info};
 use rayon::prelude::*;
+use std::borrow::Cow;
 use std::fs;
 use std::path::PathBuf;
 use std::time::Instant;
 use tauri::command;
 use xcap::Monitor;
+
+#[cfg(target_os = "macos")]
+use arboard::Clipboard;
 
 /// 截图并返回Base64编码的JPEG图像
 #[command]
@@ -287,6 +291,132 @@ pub fn capture_and_save_region(x: u32, y: u32, width: u32, height: u32) -> Resul
 
     info!("区域截图已保存: {}", file_path);
     Ok(file_path)
+}
+
+/// 截图指定区域并复制到剪贴板
+#[command]
+pub fn capture_and_copy_region(x: u32, y: u32, width: u32, height: u32) -> Result<String, String> {
+    info!("开始捕获并复制区域截图到剪贴板...");
+    info!(
+        "接收到的参数: x={}, y={}, width={}, height={}",
+        x, y, width, height
+    );
+
+    // 获取所有显示器
+    let monitors = Monitor::all().map_err(|e| {
+        error!("获取显示器列表失败: {}", e);
+        e.to_string()
+    })?;
+
+    // 获取主显示器
+    let monitor = monitors
+        .into_iter()
+        .next()
+        .ok_or("未找到可用显示器".to_string())?;
+
+    // 截图整个屏幕
+    let image = monitor.capture_image().map_err(|e| {
+        error!("截图失败: {}", e);
+        format!("截图失败: {}", e)
+    })?;
+
+    let screen_width = image.width();
+    let screen_height = image.height();
+    let rgba_data = image.as_raw();
+
+    info!("屏幕尺寸: {}x{}", screen_width, screen_height);
+    info!("RGBA数据总大小: {} 字节", rgba_data.len());
+
+    // 验证区域是否在屏幕范围内
+    if x + width > screen_width || y + height > screen_height {
+        error!(
+            "指定区域超出屏幕范围: screen={}x{}, region=({}, {}, {}x{})",
+            screen_width, screen_height, x, y, width, height
+        );
+        return Err("指定区域超出屏幕范围".to_string());
+    }
+
+    // 计算预期的数据大小
+    let expected_size = (width * height * 4) as usize;
+    info!(
+        "裁剪区域预期数据大小: {} 字节 ({} x {} x 4)",
+        expected_size, width, height
+    );
+
+    // 将RGBA数据转换为image::RgbaImage
+    let full_image = image::RgbaImage::from_raw(screen_width, screen_height, rgba_data.to_vec())
+        .ok_or("无法创建图像".to_string())?;
+
+    // 裁剪指定区域
+    let cropped_view = imageops::crop_imm(&full_image, x, y, width, height);
+
+    // 手动提取裁剪区域的像素数据，创建新的独立图像
+    let cropped_data = cropped_view.to_image();
+
+    info!(
+        "裁剪后图像实际尺寸: {}x{}",
+        cropped_data.width(),
+        cropped_data.height()
+    );
+    info!(
+        "裁剪后图像实际数据大小: {} 字节",
+        cropped_data.as_raw().len()
+    );
+
+    // 将裁剪后的图像转换为PNG格式的字节数据（PNG支持透明度，适合剪贴板）
+    let mut buffer = Vec::new();
+    {
+        let cropped_width = cropped_data.width();
+        let cropped_height = cropped_data.height();
+        let raw_data = cropped_data.as_raw();
+
+        info!("PNG编码器使用尺寸: {}x{}", cropped_width, cropped_height);
+        info!("PNG编码器将处理数据: {} 字节", raw_data.len());
+
+        let mut encoder = png::Encoder::new(&mut buffer, cropped_width, cropped_height);
+        // 设置颜色类型为RGBA，因为我们传递的是RGBA数据（每像素4字节）
+        encoder.set_color(png::ColorType::Rgba);
+        encoder.set_depth(png::BitDepth::Eight);
+
+        let mut writer = encoder.write_header().map_err(|e| {
+            error!("PNG编码头失败: {}", e);
+            format!("PNG编码头失败: {}", e)
+        })?;
+        writer.write_image_data(raw_data).map_err(|e| {
+            error!("PNG编码数据失败: {}", e);
+            format!("PNG编码数据失败: {}", e)
+        })?;
+    }
+
+    // 将图像复制到剪贴板
+    #[cfg(target_os = "macos")]
+    {
+        let mut clipboard = Clipboard::new().map_err(|e| {
+            error!("无法访问剪贴板: {}", e);
+            format!("无法访问剪贴板: {}", e)
+        })?;
+
+        let raw_data = cropped_data.as_raw().to_vec();
+        clipboard
+            .set_image(arboard::ImageData {
+                width: cropped_data.width() as usize,
+                height: cropped_data.height() as usize,
+                bytes: Cow::Owned(raw_data),
+            })
+            .map_err(|e| {
+                error!("无法复制图像到剪贴板: {}", e);
+                format!("无法复制图像到剪贴板: {}", e)
+            })?;
+
+        info!("区域截图已复制到剪贴板");
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        return Err("剪贴板功能仅支持macOS".to_string());
+    }
+
+    Ok("截图已复制到剪贴板".to_string())
 }
 
 #[cfg(test)]

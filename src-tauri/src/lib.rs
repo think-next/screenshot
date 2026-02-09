@@ -189,6 +189,7 @@ pub fn run() {
             screenshot::capture_region,
             screenshot::save_screenshot,
             screenshot::capture_and_save_region,
+            screenshot::capture_and_copy_region,
             set_macos_presentation_mode
         ])
         .run(tauri::generate_context!())

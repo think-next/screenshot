@@ -110,71 +110,95 @@ async function handleSelectionEvent(payload: any) {
   }
 }
 
+// 处理确认截图事件
+async function handleConfirmScreenshot() {
+  console.log('handleConfirmScreenshot called');
+  console.log('selection.value:', selection.value);
+  console.log('isFullscreenView.value:', isFullscreenView.value);
+  
+  if (!selection.value || !isFullscreenView.value) {
+    console.log('Early return: selection or isFullscreenView is false');
+    return;
+  }
+  
+  try {
+    console.log('========================================');
+    console.log('前端显示的CSS像素:', selection.value);
+    console.log('devicePixelRatio:', devicePixelRatio);
+    
+    // 获取背景图容器的实际尺寸
+    const bgElement = document.querySelector('#app') as HTMLElement;
+    const bgWidth = bgElement?.offsetWidth || window.innerWidth;
+    const bgHeight = bgElement?.offsetHeight || window.innerHeight;
+    
+    console.log(`背景图容器实际尺寸: ${bgWidth}x${bgHeight}`);
+    
+    // 前端的CSS像素坐标需要映射到屏幕的物理像素
+    // 比例 = 屏幕宽度 / 容器宽度（通常 = devicePixelRatio）
+    const scaleX = window.screen.width / bgWidth;
+    const scaleY = window.screen.height / bgHeight;
+    
+    console.log(`坐标缩放比例: scaleX=${scaleX}, scaleY=${scaleY}`);
+    
+    // 应用缩放比例
+    const x = Math.round(selection.value.startX * scaleX);
+    const y = Math.round(selection.value.startY * scaleY);
+    const width = Math.round(selection.value.width * scaleX);
+    const height = Math.round(selection.value.height * scaleY);
+    
+    console.log('映射到屏幕物理像素:');
+    console.log(`  x: ${x} (CSS: ${selection.value.startX} * ${scaleX})`);
+    console.log(`  y: ${y} (CSS: ${selection.value.startY} * ${scaleY})`);
+    console.log(`  width: ${width} (CSS: ${selection.value.width} * ${scaleX})`);
+    console.log(`  height: ${height} (CSS: ${selection.value.height} * ${scaleY})`);
+    console.log('========================================');
+    
+    console.log('About to invoke capture_and_copy_region...');
+    // 调用后端命令捕获并复制到剪贴板
+    const tauriApi: any = await import('@tauri-apps/api/core');
+    console.log('tauriApi imported, invoking command...');
+    const result = await tauriApi.invoke('capture_and_copy_region', {
+      x: x,
+      y: y,
+      width: width,
+      height: height
+    });
+    
+    console.log('Screenshot copied to clipboard:', result);
+    
+    // 退出全屏模式
+    const currentWindow = getCurrentWindow();
+    if (currentWindow && typeof currentWindow.setFullscreen === 'function') {
+      await currentWindow.setFullscreen(false);
+      console.log('Fullscreen exited after screenshot');
+      
+      // 恢复 macOS 演示模式
+      try {
+        await tauriApi.invoke('set_macos_presentation_mode', { fullscreen: false });
+        console.log('macOS presentation mode restored');
+      } catch (presentErr) {
+        console.warn('Failed to restore macOS presentation mode:', presentErr);
+      }
+      
+      // 退出全屏查看模式
+      isFullscreenView.value = false;
+      screenshotData.value = null;
+      stopTracking();
+      stopRegionSelection();
+      clearSelection();
+    }
+  } catch (err) {
+    console.error('Failed to capture and copy screenshot:', err);
+    alert('截图失败: ' + err);
+  }
+}
+
 onMounted(async () => {
   try {
     const evt: any = await import('@tauri-apps/api/event');
     // listen for selection events emitted by overlay
     selectionUnlisten = await evt.listen('screenshot-selection', (e: any) => {
       handleSelectionEvent(e.payload);
-    });
-
-    // 监听选择状态变化，当用户完成选择时自动截图
-    watch([selection, isSelecting], async ([newSelection, newIsSelecting]) => {
-      // 当选择完成且有有效的选区时
-      if (!newIsSelecting && newSelection && newSelection.width > 5 && newSelection.height > 5 && isFullscreenView.value) {
-        try {
-          console.log('Selection completed, capturing region:', newSelection);
-          console.log('Device pixel ratio:', devicePixelRatio);
-          
-          // 将 CSS 像素转换为物理像素（Retina 显示器需要）
-          const physicalX = Math.round(newSelection.startX * devicePixelRatio);
-          const physicalY = Math.round(newSelection.startY * devicePixelRatio);
-          const physicalWidth = Math.round(newSelection.width * devicePixelRatio);
-          const physicalHeight = Math.round(newSelection.height * devicePixelRatio);
-          
-          console.log('CSS pixels:', newSelection);
-          console.log('Physical pixels:', { x: physicalX, y: physicalY, width: physicalWidth, height: physicalHeight });
-          
-          // 调用后端命令捕获并保存区域截图
-          const tauriApi: any = await import('@tauri-apps/api/core');
-          const filePath = await tauriApi.invoke('capture_and_save_region', {
-            x: physicalX,
-            y: physicalY,
-            width: physicalWidth,
-            height: physicalHeight
-          });
-          
-          console.log('Screenshot saved to:', filePath);
-          
-          // 显示保存成功提示（可选）
-          alert(`截图已保存到: ${filePath}`);
-          
-          // 退出全屏模式
-          const currentWindow = getCurrentWindow();
-          if (currentWindow && typeof currentWindow.setFullscreen === 'function') {
-            await currentWindow.setFullscreen(false);
-            console.log('Fullscreen exited after screenshot');
-            
-            // 恢复 macOS 演示模式
-            try {
-              await tauriApi.invoke('set_macos_presentation_mode', { fullscreen: false });
-              console.log('macOS presentation mode restored');
-            } catch (presentErr) {
-              console.warn('Failed to restore macOS presentation mode:', presentErr);
-            }
-            
-            // 退出全屏查看模式
-            isFullscreenView.value = false;
-            screenshotData.value = null;
-            stopTracking();
-            stopRegionSelection();
-            clearSelection();
-          }
-        } catch (err) {
-          console.error('Failed to capture and save screenshot:', err);
-          alert('截图保存失败: ' + err);
-        }
-      }
     });
     
     // 添加键盘事件监听器，用于ESC键退出全屏
@@ -253,6 +277,7 @@ onBeforeUnmount(() => {
       :visible="isFullscreenView"
       :selection="selection"
       :show-dimensions="true"
+      @confirm="handleConfirmScreenshot"
     />
   </div>
 </template>

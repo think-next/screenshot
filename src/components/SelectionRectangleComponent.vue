@@ -8,11 +8,17 @@ interface Props {
   showDimensions?: boolean
 }
 
+interface Emits {
+  (e: 'confirm'): void
+}
+
 const props = withDefaults(defineProps<Props>(), {
   visible: false,
   selection: null,
   showDimensions: true
 });
+
+const emit = defineEmits<Emits>();
 
 const rectangleStyle = computed(() => {
   if (!props.selection) {
@@ -34,6 +40,10 @@ const dimensionText = computed(() => {
   if (!props.selection) return '';
   return `${props.selection.width} × ${props.selection.height}`;
 });
+
+function handleConfirm() {
+  emit('confirm');
+}
 </script>
 
 <template>
@@ -43,10 +53,23 @@ const dimensionText = computed(() => {
       <!-- Border overlay for better visibility -->
       <div class="selection-border"></div>
       
-      <!-- Dimension label -->
+      <!-- Corner handles for resizing -->
+      <div class="corner-handle top-left"></div>
+      <div class="corner-handle top-right"></div>
+      <div class="corner-handle bottom-left"></div>
+      <div class="corner-handle bottom-right"></div>
+      
+      <!-- Dimension label (moved to top-left corner) -->
       <div v-if="showDimensions" class="dimension-label">
         {{ dimensionText }}
       </div>
+      
+      <!-- Confirm button (positioned below rectangle) -->
+      <button class="confirm-button" @click="handleConfirm">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="20 6 9 17 4 12"></polyline>
+        </svg>
+      </button>
     </div>
   </div>
 </template>
@@ -74,19 +97,93 @@ const dimensionText = computed(() => {
   pointer-events: none;
 }
 
+/* Corner handles for resizing */
+.corner-handle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: #4287f5;
+  border: 2px solid white;
+  border-radius: 2px;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.corner-handle.top-left {
+  top: -6px;
+  left: -6px;
+  cursor: nw-resize;
+}
+
+.corner-handle.top-right {
+  top: -6px;
+  right: -6px;
+  cursor: ne-resize;
+}
+
+.corner-handle.bottom-left {
+  bottom: -6px;
+  left: -6px;
+  cursor: sw-resize;
+}
+
+.corner-handle.bottom-right {
+  bottom: -6px;
+  right: -6px;
+  cursor: se-resize;
+}
+
+/* Dimension label positioned at top-left corner inside rectangle */
 .dimension-label {
   position: absolute;
-  bottom: -30px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(0, 0, 0, 0.75);
+  top: 0;
+  left: 0;
+  background: rgba(66, 135, 245, 0.9);
   color: white;
   padding: 4px 8px;
-  border-radius: 4px;
+  border-radius: 0 0 6px 0;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   pointer-events: none;
   backdrop-filter: blur(4px);
+}
+
+/* Confirm button positioned below rectangle */
+.confirm-button {
+  position: absolute;
+  left: 50%;
+  bottom: -48px;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #4287f5;
+  border: 3px solid white;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+  box-shadow: 0 4px 12px rgba(66, 135, 245, 0.4);
+  transition: all 0.2s ease;
+  padding: 0;
+}
+
+.confirm-button:hover {
+  background: #3a6ecf;
+  transform: translateX(-50%) scale(1.1);
+  box-shadow: 0 6px 16px rgba(66, 135, 245, 0.5);
+}
+
+.confirm-button:active {
+  transform: translateX(-50%) scale(0.95);
+}
+
+.confirm-button svg {
+  width: 20px;
+  height: 20px;
 }
 </style>
