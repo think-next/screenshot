@@ -11,13 +11,9 @@ const selectionInfo = ref<{x:number,y:number,w:number,h:number}|null>(null);
 const screenshotData = ref<string|null>(null);
 const isFullscreenView = ref(false); // 是否处于全屏查看模式
 
-let selectionUnlisten: (() => void) | null = null;
-const { position: mousePosition, startTracking, stopTracking } = useCrosshair();
-const { isSelecting, selection, startSelection: startRegionSelection, stopSelection: stopRegionSelection, clearSelection } = useSelection();
-
-// 获取设备像素比，用于在 Retina 显示器上正确映射坐标
-const devicePixelRatio = window.devicePixelRatio || 1;
-console.log('Device pixel ratio:', devicePixelRatio);
+  let selectionUnlisten: (() => void) | null = null;
+  const { position: mousePosition, startTracking, stopTracking } = useCrosshair();
+  const { isSelecting, selection, startSelection: startRegionSelection, stopSelection: stopRegionSelection, clearSelection } = useSelection();
 
 async function startOverlayWindow() {
   try {
@@ -124,19 +120,24 @@ async function handleConfirmScreenshot() {
   try {
     console.log('========================================');
     console.log('前端显示的CSS像素:', selection.value);
-    console.log('devicePixelRatio:', devicePixelRatio);
     
     // 获取背景图容器的实际尺寸
     const bgElement = document.querySelector('#app') as HTMLElement;
     const bgWidth = bgElement?.offsetWidth || window.innerWidth;
     const bgHeight = bgElement?.offsetHeight || window.innerHeight;
     
-    console.log(`背景图容器实际尺寸: ${bgWidth}x${bgHeight}`);
+    // 获取设备像素比
+    const devicePixelRatio = window.devicePixelRatio || 1;
     
-    // 前端的CSS像素坐标需要映射到屏幕的物理像素
-    // 比例 = 屏幕宽度 / 容器宽度（通常 = devicePixelRatio）
-    const scaleX = window.screen.width / bgWidth;
-    const scaleY = window.screen.height / bgHeight;
+    console.log(`背景图容器实际CSS尺寸: ${bgWidth}x${bgHeight}`);
+    console.log(`window.screen 物理像素: ${window.screen.width}x${window.screen.height}`);
+    console.log(`window.innerWidth CSS像素: ${window.innerWidth}x${window.innerHeight}`);
+    console.log(`devicePixelRatio: ${devicePixelRatio}`);
+    
+    // CSS像素到物理像素的转换比例
+    // CSS像素 * devicePixelRatio = 物理像素
+    const scaleX = devicePixelRatio;
+    const scaleY = devicePixelRatio;
     
     console.log(`坐标缩放比例: scaleX=${scaleX}, scaleY=${scaleY}`);
     
