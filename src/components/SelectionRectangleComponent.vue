@@ -111,43 +111,44 @@ function handleConfirm() {
 }
 
 .corner-handle.top-left {
-  top: -6px;
-  left: -6px;
+  top: -16px;
+  left: -16px;
   cursor: nw-resize;
 }
 
 .corner-handle.top-right {
-  top: -6px;
-  right: -6px;
+  top: -16px;
+  right: -16px;
   cursor: ne-resize;
 }
 
 .corner-handle.bottom-left {
-  bottom: -6px;
-  left: -6px;
+  bottom: -16px;
+  left: -16px;
   cursor: sw-resize;
 }
 
 .corner-handle.bottom-right {
-  bottom: -6px;
-  right: -6px;
+  bottom: -16px;
+  right: -16px;
   cursor: se-resize;
 }
 
-/* Dimension label positioned at top-left corner inside rectangle */
+/* Dimension label positioned above rectangle (outside) */
 .dimension-label {
   position: absolute;
-  top: 0;
+  top: -28px;
   left: 0;
   background: rgba(66, 135, 245, 0.9);
   color: white;
   padding: 4px 8px;
-  border-radius: 0 0 6px 0;
+  border-radius: 4px;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
   pointer-events: none;
   backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }
 
 /* Confirm button positioned below rectangle */

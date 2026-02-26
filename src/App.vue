@@ -130,7 +130,7 @@ async function handleConfirmScreenshot() {
     const devicePixelRatio = window.devicePixelRatio || 1;
     
     console.log(`背景图容器实际CSS尺寸: ${bgWidth}x${bgHeight}`);
-    console.log(`window.screen 物理像素: ${window.screen.width}x${window.screen.height}`);
+    console.log(`window.screen CSS像素: ${window.screen.width}x${window.screen.height}`);
     console.log(`window.innerWidth CSS像素: ${window.innerWidth}x${window.innerHeight}`);
     console.log(`devicePixelRatio: ${devicePixelRatio}`);
     
@@ -141,11 +141,14 @@ async function handleConfirmScreenshot() {
     
     console.log(`坐标缩放比例: scaleX=${scaleX}, scaleY=${scaleY}`);
     
-    // 应用缩放比例
-    const x = Math.round(selection.value.startX * scaleX);
-    const y = Math.round(selection.value.startY * scaleY);
-    const width = Math.round(selection.value.width * scaleX);
-    const height = Math.round(selection.value.height * scaleY);
+    // 矩形边框宽度（来自SelectionRectangleComponent）
+    const borderSize = 2;
+    
+    // 应用缩放比例，并减去边框宽度（截图区域不包含border）
+    const x = Math.round((selection.value.startX + borderSize) * scaleX);
+    const y = Math.round((selection.value.startY + borderSize) * scaleY);
+    const width = Math.round((selection.value.width - borderSize * 2) * scaleX);
+    const height = Math.round((selection.value.height - borderSize * 2) * scaleY);
     
     console.log('映射到屏幕物理像素:');
     console.log(`  x: ${x} (CSS: ${selection.value.startX} * ${scaleX})`);
